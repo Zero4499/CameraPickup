@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>EEW緊急地震速報</title>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100vw; height: 100vh;
+    background: transparent;
+    overflow: hidden;
+    font-family: "A-OTF UD Shin Go Pro DB", sans-serif;
+  }
+  #alert {
+    display: none;
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: url("https://github.com/Zero4499/CameraPickup/blob/main/eewjp.png?raw=true") no-repeat center center;
+    background-size: cover;
+    pointer-events: none;
+    z-index: 10;
+  }
+  #text-container {
+    position: absolute;
+    top: 296.5px;
+    left: 806.03px;
+    width: 2119.94px;
+    height: 115px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    visibility: hidden;
+    z-index: 20;
+  }
+  #text {
+    color: white;
+    font-size: 115px;
+    line-height: 1;
+    white-space: nowrap;
+    transform-origin: left center;
+  }
+</style>
+</head>
+<body>
+
+<div id="alert"></div>
+<div id="text-container"><div id="text"></div></div>
+
+<audio id="alertSound" src="https://github.com/Zero4499/CameraPickup/raw/refs/heads/main/EEW2.mp3" preload="auto"></audio>
+
+<script>
+  const alertDiv = document.getElementById("alert");
+  const textContainer = document.getElementById("text-container");
+  const textDiv = document.getElementById("text");
+  const audio = document.getElementById("alertSound");
+  let hideTimeoutId = null;
+  let isAlertShown = false;
+
+  function fitText() {
+    textDiv.style.transform = "scaleX(1)";
+    if (textDiv.scrollWidth > textContainer.clientWidth) {
+      const scale = textContainer.clientWidth / textDiv.scrollWidth;
+      textDiv.style.transform = `scaleX(${scale})`;
+    }
+  }
+
+  function parseIssueTime(issueTimeStr) {
+    if (!issueTimeStr) return null;
+    const fixedStr = issueTimeStr.replace(/\//g, "-").replace(" ", "T");
+    return new Date(fixedStr);
+  }
+
+  function isIssueTimeValid(issueTimeStr) {
+    const issueTime = parseIssueTime(issueTimeStr);
+    if (!issueTime || isNaN(issueTime)) return false;
+    const now = new Date();
+    const diffSeconds = (now - issueTime) / 1000;
+    return diffSeconds >= 0 && diffSeconds <= 60;
+  }
+
+  async function fetchLatestPrefs() {
+    try {
+      const resp = await fetch("https://api.p2pquake.net/v2/history?codes=556&limit=1");
+      const data = await resp.json();
+      const latest = data[0];
+      if (!latest) return null;
+      const issueTimeStr = latest.issue?.time;
+      if (!isIssueTimeValid(issueTimeStr)) return null;
+      const areaNames = latest.areas.map(area => area.pref).filter(Boolean);
+      if (areaNames.length === 0) return null;
+      return areaNames.join('　');
+    } catch (e) {
+      console.error("获取速报失败", e);
+      return null;
+    }
+  }
+
+  function showAlert(text) {
+    textDiv.textContent = text;
+    fitText();
+    alertDiv.style.display = "block";
+    textContainer.style.visibility = "visible";
+  }
+
+  function hideAlert() {
+    alertDiv.style.display = "none";
+    textContainer.style.visibility = "hidden";
+    textDiv.textContent = "";
+    audio.pause();
+    audio.currentTime = 0;
+    isAlertShown = false;
+    if (hideTimeoutId) {
+      clearTimeout(hideTimeoutId);
+      hideTimeoutId = null;
+    }
+  }
+
+  async function checkAndShowEEW() {
+    const text = await fetchLatestPrefs();
+
+    if (!text) {
+      if (isAlertShown) {
+        hideAlert();
+      }
+      return;
+    }
+
+    if (!isAlertShown) {
+      showAlert(text);
+      try {
+        audio.pause();
+        audio.currentTime = 0;
+        await audio.play();
+      } catch (e) {
+        console.warn("音频播放失败:", e);
+      }
+      isAlertShown = true;
+
+      if (hideTimeoutId) clearTimeout(hideTimeoutId);
+      hideTimeoutId = setTimeout(() => {
+        hideAlert();
+      }, 60000);
+    } else {
+      textDiv.textContent = text;
+      fitText();
+    }
+  }
+
+  setInterval(checkAndShowEEW, 2000);
+
+  // 解锁音频播放（用户首次点击页面）
+  document.body.addEventListener('click', () => {
+    audio.play().then(() => {
+      audio.pause();
+      audio.currentTime = 0;
+    }).catch(() => {});
+  }, { once: true });
+</script>
+
+</body>
+</html>
