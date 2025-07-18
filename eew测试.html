@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>EEW緊急地震速報テスト</title>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100vw; height: 100vh;
+    background: transparent;
+    overflow: hidden;
+    font-family: "A-OTF UD Shin Go Pro DB", sans-serif;
+  }
+  #alert {
+    display: none;
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: url("https://raw.githubusercontent.com/Zero4499/CameraPickup/refs/heads/main/eewjp.png") no-repeat center center;
+    background-size: cover;
+    pointer-events: none;
+    z-index: 10;
+  }
+  #text-container {
+    position: absolute;
+    top: 296.5px;
+    left: 806.03px;
+    width: 2119.94px;
+    height: 115px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    visibility: hidden;
+    z-index: 20;
+  }
+  #text {
+    color: white;
+    font-size: 115px;
+    line-height: 1;
+    white-space: nowrap;
+    transform-origin: left center;
+  }
+  #btn-container {
+    position: fixed;
+    top: 10px; left: 10px;
+    z-index: 100;
+  }
+  button {
+    font-size: 16px;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="alert"></div>
+<div id="text-container"><div id="text"></div></div>
+
+<div id="btn-container">
+  <button id="testButton">立即触发测试速报</button>
+</div>
+
+<audio id="alertSound" src="https://github.com/Zero4499/CameraPickup/raw/refs/heads/main/EEW2.mp3" preload="auto"></audio>
+
+<script>
+  const alertDiv = document.getElementById("alert");
+  const textContainer = document.getElementById("text-container");
+  const textDiv = document.getElementById("text");
+  const audio = document.getElementById("alertSound");
+  let hideTimeoutId = null;
+
+  function fitText() {
+    textDiv.style.transform = "scaleX(1)";
+    if (textDiv.scrollWidth > textContainer.clientWidth) {
+      const scale = textContainer.clientWidth / textDiv.scrollWidth;
+      textDiv.style.transform = `scaleX(${scale})`;
+    }
+  }
+
+  function showAlert(text) {
+    textDiv.textContent = text;
+    fitText();
+    alertDiv.style.display = "block";
+    textContainer.style.visibility = "visible";
+  }
+
+  function hideAlert() {
+    alertDiv.style.display = "none";
+    textContainer.style.visibility = "hidden";
+    textDiv.textContent = "";
+    audio.pause();
+    audio.currentTime = 0;
+  }
+
+  document.getElementById("testButton").addEventListener("click", async () => {
+    // 先清除之前的隐藏定时器，防止重叠
+    if (hideTimeoutId) {
+      clearTimeout(hideTimeoutId);
+      hideTimeoutId = null;
+    }
+
+    const testText = "地域名1";
+    showAlert(testText);
+
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+      await audio.play();
+    } catch(e) {
+      console.warn("音频播放失败:", e);
+    }
+
+    // 1分钟后隐藏并恢复初始化状态
+    hideTimeoutId = setTimeout(() => {
+      hideAlert();
+      hideTimeoutId = null;
+    }, 60000);
+  });
+</script>
+
+</body>
+</html>
